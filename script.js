@@ -1,26 +1,17 @@
-// String.prototype.replaceAt = function (index, replacement) {
-//   return (
-//     this.substr(0, index) +
-//     replacement +
-//     this.substr(index + replacement.length)
-//   );
-// };
-
 //ESTILO DEL PERSONAJE
-jerry_left = new Image();
-jerry_left.src = "resources/jerry.png";
+function cargarImagen(nombre) {
+  const imagen = new Image();
+  imagen.src = "resources/" + nombre;
+  return imagen;
+}
 
-jerry_right = new Image();
-jerry_right.src = "resources/jerry_right.png";
-
-jerry_up = new Image();
-jerry_up.src = "resources/jerry_up.png";
-
-jerry_down = new Image();
-jerry_down.src = "resources/jerry_down.png";
-
-cheese = new Image();
-cheese.src = "resources/cheesItem.png";
+// Asignación de imágenes
+const jerry_left = cargarImagen("jerry.png");
+const jerry_right = cargarImagen("jerry_right.png");
+const jerry_up = cargarImagen("jerry_up.png");
+const jerry_down = cargarImagen("jerry_down.png");
+const cheese = cargarImagen("cheesItem.png");
+console.log(cheese);
 //META
 let meta;
 let fin = document.getElementById("meta");
@@ -38,16 +29,14 @@ let voids = [];
 let walls = [];
 let personajeX;
 let personajeY;
-
-
+let space;
 function createMaze() {
   //Se asigna el tamaño del laberinto
-
   const element = document.getElementById("marco");
   const rect = element.getBoundingClientRect();
   const width = rect.width;
   const height = rect.height;
-
+  space = 2*height+2*width;
   for (let i = 1; i <= height / 25; i++) {
     for (let j = 1; j <= width / 25; j++) {
       let name = "ct";
@@ -86,23 +75,22 @@ function createMaze() {
   corners[3] = voids.at(-1);
   console.log("ESQUINAS: " + corners);
 
-  //Pintar elementos
-  //FONDO DEL CUADRO
+  // Pintar elementos
   context.fillStyle = "lightblue";
   context.fillRect(0, 0, width, height);
   context.strokeRect(0, 0, width, height);
 
-  //Bordes
-  borders.forEach(function (border) {
+  // Bordes
+  for (const border of borders) {
     pintar(border, "black", 25);
-  });
-  walls.forEach(function (wall) {
+  }
+  for (const wall of walls) {
     pintar(wall, "black", 25);
-  });
+  }
 
   //Generar laberinto
   //Escoger posición/casilla inicial de manera random
-  let rngStart = Math.round(Math.random() * (voids.length - 1));
+  // let rngStart = Math.round(Math.random() * (voids.length - 1));
   //Extraemos del array paredes la posición inicial y lo metemos en el array visitiados
   visiteds[0] = voids[0];
   voids.splice(0, 1);
@@ -113,63 +101,37 @@ function createMaze() {
   //INICIO BUCLE(buscar caminos hasta que todos los puntos esten conectados)
   while (voids.length > 0) {
     //-------------------------Selecionar vecinos--------------------------------------------------------------
-    let xV = parseInt(actual.charAt(4) + actual.charAt(5));
-    let yV = parseInt(actual.charAt(2) + actual.charAt(3));
+    let xV = parseInt(actual.slice(4, 6));
+    let yV = parseInt(actual.slice(2, 4));
     let leftPos = xV - 2;
     let rightPos = xV + 2;
     let upPos = yV - 2;
     let downPos = yV + 2;
 
-    if (leftPos < 10) {
-      leftPos = "0" + leftPos;
-    }
-    if (rightPos < 10) {
-      rightPos = "0" + rightPos;
-    }
-    if (upPos < 10) {
-      upPos = "0" + upPos;
-    }
-    if (downPos < 10) {
-      downPos = "0" + downPos;
-    }
-    if (xV < 10) {
-      xV = "0" + xV;
-    }
-    if (yV < 10) {
-      yV = "0" + yV;
-    }
-    //Todos los vecinos de la posicion actual
-    let left = "ct" + yV.toString() + leftPos.toString();
-    let right = "ct" + yV.toString() + rightPos.toString();
-    let up = "ct" + upPos.toString() + xV.toString();
-    let down = "ct" + downPos.toString() + xV.toString();
+    [xV, yV, leftPos, rightPos, upPos, downPos] = [
+      xV,
+      yV,
+      leftPos,
+      rightPos,
+      upPos,
+      downPos,
+    ].map((value) => value.toString().padStart(2, "0"));
+
+    // Todos los vecinos de la posición actual
+    let left = "ct" + yV + leftPos;
+    let right = "ct" + yV + rightPos;
+    let up = "ct" + upPos + xV;
+    let down = "ct" + downPos + xV;
 
     let Vecinas = [left, right, up, down];
     let WrongVecinas = [];
-    //Bucles para buscar vecinos que no se pueden visitar
-    for (let i = 0; i < Vecinas.length; i++) {
-      borders.forEach(function (border) {
-        if (Vecinas[i] == border) {
-          WrongVecinas.push(Vecinas[i]);
-          Vecinas.splice(i, 1);
-          i = 0;
-        }
-      });
-    }
-    for (let i = 0; i < Vecinas.length; i++) {
-      visiteds.forEach(function (visited) {
-        if (Vecinas[i] == visited) {
-          WrongVecinas.push(Vecinas[i]);
-        }
-      });
-    }
-    for (let i = 0; i < Vecinas.length; i++) {
-      WrongVecinas.forEach(function (wVecina) {
-        if (wVecina == Vecinas[i]) {
-          Vecinas.splice(i, 1);
-        }
-      });
-    }
+    
+    // Buscar vecinos que no se pueden visitar
+    WrongVecinas = Vecinas.filter(neighbor => borders.includes(neighbor));
+    WrongVecinas = WrongVecinas.concat(Vecinas.filter(neighbor => visiteds.includes(neighbor)));
+    
+    Vecinas = Vecinas.filter(neighbor => !WrongVecinas.includes(neighbor));
+    
     //La casilla no esta bloqueda
     if (Vecinas.length >= 1) {
       NoBlockeds.push(actual);
@@ -256,13 +218,7 @@ function createMaze() {
   pintar(meta, "lighgreen", 25);
   let mx = parseInt(meta.charAt(4) + meta.charAt(5));
   let my = parseInt(meta.charAt(2) + meta.charAt(3));
-  context.drawImage(
-    cheese,
-    (mx - 1) * 25,
-    (my - 1) * 25,
-    25,
-    25
-  );
+  context.drawImage(cheese, (mx - 1) * 25, (my - 1) * 25, 25, 25);
 }
 //Funcion para pintar un cuadrado dado un elemento del tipo "ct+x+y"
 function pintar(square, color, size) {
@@ -277,14 +233,14 @@ function pintar(square, color, size) {
 //Buscamos los no bloqueados y cambiamos el actual al ultimo no bloqueado
 function buscarNoBlockeds() {
   actualizarNoBlockeds();
-  let newActual = NoBlockeds.at(-1);
-  NoBlockeds.pop();
-  return newActual;
+  return NoBlockeds.pop();
 }
+
 //Comprobamos cada elemento del array no bloqueados para ver si los movimientos posteriores
 //a su inserción en el array, han hecho que la casilla este ahora bloqueada
 function actualizarNoBlockeds() {
-  NoBlockeds.forEach(function (NBlocked, key) {
+  for (let key = NoBlockeds.length - 1; key >= 0; key--) {
+    let NBlocked = NoBlockeds[key];
     let xV = parseInt(NBlocked.charAt(4) + NBlocked.charAt(5));
     let yV = parseInt(NBlocked.charAt(2) + NBlocked.charAt(3));
     let leftPos = xV - 2;
@@ -292,62 +248,44 @@ function actualizarNoBlockeds() {
     let upPos = yV - 2;
     let downPos = yV + 2;
 
-    if (leftPos < 10) {
-      leftPos = "0" + leftPos;
-    }
-    if (rightPos < 10) {
-      rightPos = "0" + rightPos;
-    }
-    if (upPos < 10) {
-      upPos = "0" + upPos;
-    }
-    if (downPos < 10) {
-      downPos = "0" + downPos;
-    }
-    if (xV < 10) {
-      xV = "0" + xV;
-    }
-    if (yV < 10) {
-      yV = "0" + yV;
-    }
-    let left = "ct" + yV.toString() + leftPos.toString();
-    let right = "ct" + yV.toString() + rightPos.toString();
-    let up = "ct" + upPos.toString() + xV.toString();
-    let down = "ct" + downPos.toString() + xV.toString();
+    let formattedLeftPos = leftPos < 10 ? "0" + leftPos : leftPos;
+    let formattedRightPos = rightPos < 10 ? "0" + rightPos : rightPos;
+    let formattedUpPos = upPos < 10 ? "0" + upPos : upPos;
+    let formattedDownPos = downPos < 10 ? "0" + downPos : downPos;
+    let formattedXV = xV < 10 ? "0" + xV : xV;
+    let formattedYV = yV < 10 ? "0" + yV : yV;
+
+    let left = "ct" + formattedYV.toString() + formattedLeftPos.toString();
+    let right = "ct" + formattedYV.toString() + formattedRightPos.toString();
+    let up = "ct" + formattedUpPos.toString() + formattedXV.toString();
+    let down = "ct" + formattedDownPos.toString() + formattedXV.toString();
 
     let Vecinas = [left, right, up, down];
     let WrongVecinas = [];
 
-    for (let i = 0; i < Vecinas.length; i++) {
-      borders.forEach(function (border) {
-        if (Vecinas[i] == border) {
-          WrongVecinas.push(Vecinas[i]);
-          Vecinas.splice(i, 1);
-          i = 0;
-        }
-      });
-    }
-    for (let i = 0; i < Vecinas.length; i++) {
-      visiteds.forEach(function (visited) {
-        if (Vecinas[i] == visited) {
-          WrongVecinas.push(Vecinas[i]);
-        }
-      });
+    for (let i = Vecinas.length - 1; i >= 0; i--) {
+      if (borders.includes(Vecinas[i])) {
+        WrongVecinas.push(Vecinas[i]);
+        Vecinas.splice(i, 1);
+      }
     }
 
-    for (let i = 0; i < Vecinas.length; i++) {
-      WrongVecinas.forEach(function (wVecina) {
-        if (wVecina == Vecinas[i]) {
-          Vecinas.splice(i, 1);
-        }
-      });
-    }
-    if (Vecinas < 1) {
+    visiteds.forEach(function (visited) {
+      if (Vecinas.includes(visited)) {
+        WrongVecinas.push(visited);
+      }
+    });
+
+    Vecinas = Vecinas.filter(function (vecina) {
+      return !WrongVecinas.includes(vecina);
+    });
+
+    if (Vecinas.length < 1) {
       NoBlockeds.splice(key, 1);
-      key--;
     }
-  });
+  }
 }
+
 
 //MOVIMIENTOS - IN-GAME
 
@@ -407,7 +345,6 @@ function mueveCanvas(pos) {
   }
   checkMeta();
 }
-
 
 function checkMeta() {
   if (convesorCoords(personajeX, personajeY) == meta) {
@@ -505,11 +442,11 @@ function convesorCoords(x, y) {
 }
 
 function timerSet() {
-  let time = 30;
+  let time = space/40;
 
   let timer = setInterval(function () {
     let minutes = Math.floor(time / 60);
-    let seconds = time % 60;
+    let seconds = Math.round(time % 60);
     currentMinutes = minutes.toString().padStart(2, "0");
     currentSeconds = seconds.toString().padStart(2, "0");
     currentTime = currentMinutes + ":" + currentSeconds;
@@ -517,10 +454,10 @@ function timerSet() {
     time--;
     if (time < 0) {
       clearInterval(timer);
-      fin.innerHTML= "Game Over";
+      fin.innerHTML = "Game Over";
       gameOver();
     }
-    if(over){
+    if (over) {
       clearInterval(timer);
     }
     console.log(timer);
@@ -548,7 +485,7 @@ function startGame() {
   createMaze();
   personajeX = parseInt(visiteds[0].charAt(4) + visiteds[0].charAt(5));
   personajeY = parseInt(visiteds[0].charAt(2) + visiteds[0].charAt(3));
-  
+
   timerSet();
   context.drawImage(
     jerry_down,
