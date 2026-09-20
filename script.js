@@ -1,503 +1,226 @@
-//ESTILO DEL PERSONAJE
+const CELL_SIZE = 25;
+
+// Configuraciones por dificultad (filas y columnas impares para la celosía DFS)
+const DIFFICULTIES = {
+  easy: { cols: 15, rows: 15, time: 45 },
+  medium: { cols: 21, rows: 21, time: 75 },
+  hard: { cols: 29, rows: 29, time: 120 }
+};
+
 function cargarImagen(nombre) {
   const imagen = new Image();
-  imagen.src = "resources/" + nombre;
+  imagen.src = `resources/${nombre}`;
   return imagen;
 }
 
-// Asignación de imágenes
 const jerry_left = cargarImagen("jerry.png");
 const jerry_right = cargarImagen("jerry_right.png");
 const jerry_up = cargarImagen("jerry_up.png");
 const jerry_down = cargarImagen("jerry_down.png");
 const cheese = cargarImagen("cheesItem.png");
-console.log(cheese);
-//META
-let meta;
-let fin = document.getElementById("meta");
-//CUENTA INTENTOS
+
+// Nodos del DOM
+const canvas = document.getElementById("marco");
+const context = canvas.getContext("2d");
+const startScreen = document.getElementById("startScreen");
+const gameScreen = document.getElementById("cnv");
+const endScreen = document.getElementById("gameOver");
+const finDisplay = document.getElementById("meta");
+const intentosDisplay = document.getElementById("intentos");
+const timeDisplay = document.getElementById("time");
+const difficultySelect = document.getElementById("difficultySelect");
+
+// Estado de partida
+let currentMaze = [];
+let personajeX = 1;
+let personajeY = 1;
+let meta = { x: 0, y: 0 };
 let count = 0;
-let intentos = document.getElementById("intentos");
-let over;
-//MARCO PRINCIPAL
-let canvas = document.getElementById("marco");
-let context = canvas.getContext("2d");
-let visiteds = [];
-let NoBlockeds = [];
-let borders = [];
-let voids = [];
-let walls = [];
-let personajeX;
-let personajeY;
-let space;
-function createMaze() {
-  //Se asigna el tamaño del laberinto
-  const element = document.getElementById("marco");
-  const rect = element.getBoundingClientRect();
-  const width = rect.width;
-  const height = rect.height;
-  space = 2*height+2*width;
-  for (let i = 1; i <= height / 25; i++) {
-    for (let j = 1; j <= width / 25; j++) {
-      let name = "ct";
-      if (i < 10) {
-        name = name + "0" + i;
-      } else {
-        name = name + i;
-      }
-      if (j < 10) {
-        name = name + "0" + j;
-      } else {
-        name = name + j;
-      }
-      if (j < 3 || width / 25 - j <= 1 || i < 3 || height / 25 - i <= 1) {
-        borders.push(name);
-      } else if (i % 2 == 0 || (i % 2 != 0 && j % 2 == 0)) {
-        walls.push(name);
-      } else {
-        voids.push(name);
-      }
-    }
-  }
-  //Se guardan las esquinas
-  let corners = [];
-  corners[0] = voids[0];
-  let indexCor1 = Math.floor((width / 25 - 2) / 2);
-  while (voids[indexCor1].charAt(3) !== "3") {
-    indexCor1 = indexCor1 - 1;
-  }
-  corners[1] = voids[indexCor1];
-  let c2y = parseInt(voids.at(-1).charAt(2) + voids.at(-1).charAt(3));
-  if (c2y < 10) {
-    c2y = "0" + c2y;
-  }
-  corners[2] = "ct" + c2y + "03";
-  corners[3] = voids.at(-1);
-  console.log("ESQUINAS: " + corners);
+let isGameOver = false;
+let timerId = null;
 
-  // Pintar elementos
-  context.fillStyle = "lightblue";
-  context.fillRect(0, 0, width, height);
-  context.strokeRect(0, 0, width, height);
+// Mapeo lineal para la pila DFS
+const toIndex = (x, y, cols) => y * cols + x;
+const fromIndex = (idx, cols) => ({ x: idx % cols, y: Math.floor(idx / cols) });
 
-  // Bordes
-  for (const border of borders) {
-    pintar(border, "black", 25);
-  }
-  for (const wall of walls) {
-    pintar(wall, "black", 25);
-  }
+const DIRECTIONS = [
+  { dx: 0, dy: -2, wallDx: 0, wallDy: -1 },
+  { dx: 0, dy: 2, wallDx: 0, wallDy: 1 },
+  { dx: -2, dy: 0, wallDx: -1, wallDy: 0 },
+  { dx: 2, dy: 0, wallDx: 1, wallDy: 0 }
+];
 
-  //Generar laberinto
-  //Escoger posición/casilla inicial de manera random
-  // let rngStart = Math.round(Math.random() * (voids.length - 1));
-  //Extraemos del array paredes la posición inicial y lo metemos en el array visitiados
-  visiteds[0] = voids[0];
-  voids.splice(0, 1);
-  pintar(visiteds[0], "white", 25);
-
-  let actual = visiteds.at(0);
-
-  //INICIO BUCLE(buscar caminos hasta que todos los puntos esten conectados)
-  while (voids.length > 0) {
-    //-------------------------Selecionar vecinos--------------------------------------------------------------
-    let xV = parseInt(actual.slice(4, 6));
-    let yV = parseInt(actual.slice(2, 4));
-    let leftPos = xV - 2;
-    let rightPos = xV + 2;
-    let upPos = yV - 2;
-    let downPos = yV + 2;
-
-    [xV, yV, leftPos, rightPos, upPos, downPos] = [
-      xV,
-      yV,
-      leftPos,
-      rightPos,
-      upPos,
-      downPos,
-    ].map((value) => value.toString().padStart(2, "0"));
-
-    // Todos los vecinos de la posición actual
-    let left = "ct" + yV + leftPos;
-    let right = "ct" + yV + rightPos;
-    let up = "ct" + upPos + xV;
-    let down = "ct" + downPos + xV;
-
-    let Vecinas = [left, right, up, down];
-    let WrongVecinas = [];
-    
-    // Buscar vecinos que no se pueden visitar
-    WrongVecinas = Vecinas.filter(neighbor => borders.includes(neighbor));
-    WrongVecinas = WrongVecinas.concat(Vecinas.filter(neighbor => visiteds.includes(neighbor)));
-    
-    Vecinas = Vecinas.filter(neighbor => !WrongVecinas.includes(neighbor));
-    
-    //La casilla no esta bloqueda
-    if (Vecinas.length >= 1) {
-      NoBlockeds.push(actual);
-      //Vecino al azar
-      let rngContinue = Math.round(Math.random() * (Vecinas.length - 1));
-      visiteds.push(Vecinas[rngContinue]);
-      //cambiamos las variables(el anterior será el actual y el actual el vecino selecionado)
-      let previous = actual;
-      actual = visiteds.at(-1);
-      voids.forEach(function (voidN, key) {
-        if (voidN == Vecinas[rngContinue]) {
-          voids.splice(key, 1);
-        }
-      });
-      pintar(actual, "white", 25);
-      //Reconocer la dirección elegida---------------------------------------
-      //Actual coords
-      let xL = parseInt(actual.charAt(4) + actual.charAt(5));
-      let yL = parseInt(actual.charAt(2) + actual.charAt(3));
-      //Previous coords
-      let xP = parseInt(previous.charAt(4) + previous.charAt(5));
-      let yP = parseInt(previous.charAt(2) + previous.charAt(3));
-      //Diferencia entre coordenadas para saber hacia donde se ha movido
-      let x_ = xL - xP;
-      let y_ = yL - yP;
-
-      let movimiento = "blocked";
-      let yW;
-      let xW;
-      if (x_ == 2) {
-        movimiento = "right";
-      } else if (x_ == -2) {
-        movimiento = "left";
-      } else if (y_ == 2) {
-        movimiento = "down";
-      } else if (y_ == -2) {
-        movimiento = "up";
-      }
-      //Pintar la casilla de WALLS INTERMEDIA Y ELIMINARLA DE WALLS
-      context.fillStyle = "white";
-      if (movimiento == "left") {
-        xW = xP - 1;
-        yW = yP;
-        context.fillRect((xP - 2) * 25, (yP - 1) * 25, 25, 25);
-      } else if (movimiento == "right") {
-        xW = xL - 1;
-        yW = yP;
-        context.fillRect((xL - 2) * 25, (yP - 1) * 25, 25, 25);
-      } else if (movimiento == "up") {
-        xW = xP;
-        yW = yP - 1;
-        context.fillRect((xP - 1) * 25, (yP - 2) * 25, 25, 25);
-      } else if (movimiento == "down") {
-        xW = xP;
-        yW = yL - 1;
-        context.fillRect((xP - 1) * 25, (yL - 2) * 25, 25, 25);
-      }
-      let wallName = "ct";
-      if (yW < 10) {
-        wallName = wallName + "0" + yW;
-      } else {
-        wallName = wallName + yW;
-      }
-      if (xW < 10) {
-        wallName = wallName + "0" + xW;
-      } else {
-        wallName = wallName + xW;
-      }
-
-      walls.forEach(function (wall, key) {
-        if (wall == wallName) {
-          walls.splice(key, 1);
-        }
-      });
-      //La casilla está bloqueada por lo tanto nos disponemos a buscar en las no bloqueadas
-    } else {
-      actual = buscarNoBlockeds();
-    }
-  }
-
-  // let rngOut = Math.round(Math.random() * (corners.length - 1));
-  meta = corners.at(-1);
-  //Pintamos la meta
-  pintar(meta, "lighgreen", 25);
-  let mx = parseInt(meta.charAt(4) + meta.charAt(5));
-  let my = parseInt(meta.charAt(2) + meta.charAt(3));
-  context.drawImage(cheese, (mx - 1) * 25, (my - 1) * 25, 25, 25);
-}
-//Funcion para pintar un cuadrado dado un elemento del tipo "ct+x+y"
-function pintar(square, color, size) {
-  let x = parseInt(square.charAt(4) + square.charAt(5));
-  let y = parseInt(square.charAt(2) + square.charAt(3));
-  let MazePositionX = 25 * (x - 1);
-  let MazePositionY = 25 * (y - 1);
+function pintar(x, y, color) {
   context.fillStyle = color;
-  context.fillRect(MazePositionX, MazePositionY, size, size);
-  //context.strokeRect(MazePositionX, MazePositionY, size, size);
-}
-//Buscamos los no bloqueados y cambiamos el actual al ultimo no bloqueado
-function buscarNoBlockeds() {
-  actualizarNoBlockeds();
-  return NoBlockeds.pop();
+  context.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
 }
 
-//Comprobamos cada elemento del array no bloqueados para ver si los movimientos posteriores
-//a su inserción en el array, han hecho que la casilla este ahora bloqueada
-function actualizarNoBlockeds() {
-  for (let key = NoBlockeds.length - 1; key >= 0; key--) {
-    let NBlocked = NoBlockeds[key];
-    let xV = parseInt(NBlocked.charAt(4) + NBlocked.charAt(5));
-    let yV = parseInt(NBlocked.charAt(2) + NBlocked.charAt(3));
-    let leftPos = xV - 2;
-    let rightPos = xV + 2;
-    let upPos = yV - 2;
-    let downPos = yV + 2;
+function createMaze(cols, rows) {
+  const maze = Array.from({ length: rows }, () => Array(cols).fill(0));
 
-    let formattedLeftPos = leftPos < 10 ? "0" + leftPos : leftPos;
-    let formattedRightPos = rightPos < 10 ? "0" + rightPos : rightPos;
-    let formattedUpPos = upPos < 10 ? "0" + upPos : upPos;
-    let formattedDownPos = downPos < 10 ? "0" + downPos : downPos;
-    let formattedXV = xV < 10 ? "0" + xV : xV;
-    let formattedYV = yV < 10 ? "0" + yV : yV;
+  context.fillStyle = "black";
+  context.fillRect(0, 0, canvas.width, canvas.height);
 
-    let left = "ct" + formattedYV.toString() + formattedLeftPos.toString();
-    let right = "ct" + formattedYV.toString() + formattedRightPos.toString();
-    let up = "ct" + formattedUpPos.toString() + formattedXV.toString();
-    let down = "ct" + formattedDownPos.toString() + formattedXV.toString();
+  const startX = 1;
+  const startY = 1;
+  maze[startY][startX] = 1;
+  pintar(startX, startY, "white");
 
-    let Vecinas = [left, right, up, down];
-    let WrongVecinas = [];
+  const stack = [toIndex(startX, startY, cols)];
 
-    for (let i = Vecinas.length - 1; i >= 0; i--) {
-      if (borders.includes(Vecinas[i])) {
-        WrongVecinas.push(Vecinas[i]);
-        Vecinas.splice(i, 1);
-      }
-    }
+  while (stack.length > 0) {
+    const { x, y } = fromIndex(stack.at(-1), cols);
 
-    visiteds.forEach(function (visited) {
-      if (Vecinas.includes(visited)) {
-        WrongVecinas.push(visited);
-      }
-    });
+    const neighbors = DIRECTIONS.map(dir => ({
+      nx: x + dir.dx,
+      ny: y + dir.dy,
+      wx: x + dir.wallDx,
+      wy: y + dir.wallDy
+    })).filter(({ nx, ny }) =>
+        nx > 0 && nx < cols - 1 &&
+        ny > 0 && ny < rows - 1 &&
+        maze[ny][nx] === 0
+    );
 
-    Vecinas = Vecinas.filter(function (vecina) {
-      return !WrongVecinas.includes(vecina);
-    });
+    if (neighbors.length > 0) {
+      const choice = neighbors[Math.floor(Math.random() * neighbors.length)];
 
-    if (Vecinas.length < 1) {
-      NoBlockeds.splice(key, 1);
+      maze[choice.wy][choice.wx] = 1;
+      pintar(choice.wx, choice.wy, "white");
+
+      maze[choice.ny][choice.nx] = 1;
+      pintar(choice.nx, choice.ny, "white");
+
+      stack.push(toIndex(choice.nx, choice.ny, cols));
+    } else {
+      stack.pop();
     }
   }
+
+  const endX = cols - 2;
+  const endY = rows - 2;
+  pintar(endX, endY, "lightgreen");
+  context.drawImage(cheese, endX * CELL_SIZE, endY * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+
+  return {
+    maze,
+    start: { x: startX, y: startY },
+    end: { x: endX, y: endY }
+  };
 }
 
-
-//MOVIMIENTOS - IN-GAME
-
-//Movimiento por teclas del personaje
-document.onkeyup = (e) => {
-  if (e.key === "w") {
-    movimiento(1);
-  } else if (e.key === "s") {
-    movimiento(2);
-  } else if (e.key === "a") {
-    movimiento(3);
-  } else if (e.key === "d") {
-    movimiento(4);
-  }
+const MOVE_VECTORS = {
+  w: { dx: 0, dy: -1, sprite: jerry_up },
+  ArrowUp: { dx: 0, dy: -1, sprite: jerry_up },
+  s: { dx: 0, dy: 1, sprite: jerry_down },
+  ArrowDown: { dx: 0, dy: 1, sprite: jerry_down },
+  a: { dx: -1, dy: 0, sprite: jerry_left },
+  ArrowLeft: { dx: -1, dy: 0, sprite: jerry_left },
+  d: { dx: 1, dy: 0, sprite: jerry_right },
+  ArrowRight: { dx: 1, dy: 0, sprite: jerry_right }
 };
-//Limpiar el  canvas
-function clearCanvas() {
-  context.clearRect(0, 0, canvas.width, canvas.height);
-}
 
-//Mover visualmente al personaje/Ver los cambios
-function mueveCanvas(pos) {
-  pintar(last, "white", 25);
-  if (pos == 1) {
-    context.drawImage(
-      jerry_up,
-      (personajeX - 1) * 25,
-      (personajeY - 1) * 25,
-      25,
-      25
-    );
-  } else if (pos == 2) {
-    context.drawImage(
-      jerry_down,
-      (personajeX - 1) * 25,
-      (personajeY - 1) * 25,
-      25,
-      25
-    );
-  } else if (pos == 3) {
-    context.drawImage(
-      jerry_left,
-      (personajeX - 1) * 25,
-      (personajeY - 1) * 25,
-      25,
-      25
-    );
-  } else {
-    console.log("derecha");
-    context.drawImage(
-      jerry_right,
-      (personajeX - 1) * 25,
-      (personajeY - 1) * 25,
-      25,
-      25
-    );
+document.addEventListener("keydown", (e) => {
+  if (isGameOver) return;
+  const action = MOVE_VECTORS[e.key];
+  if (action) {
+    e.preventDefault();
+    handleMovement(action);
   }
-  checkMeta();
-}
+});
 
-function checkMeta() {
-  if (convesorCoords(personajeX, personajeY) == meta) {
-    fin.innerHTML = "¡HAS LLEGADO A LA META!";
-    context.fillStyle = "yellow";
-    context.fillRect((personajeX - 1) * 25, (personajeY - 1) * 25, 25, 25);
+function handleMovement({ dx, dy, sprite }) {
+  const nextX = personajeX + dx;
+  const nextY = personajeY + dy;
+
+  const isOutOfBounds = nextY < 0 || nextY >= currentMaze.length || nextX < 0 || nextX >= currentMaze[0].length;
+  if (isOutOfBounds || currentMaze[nextY][nextX] !== 1) {
+    return;
+  }
+
+  pintar(personajeX, personajeY, "white");
+
+  personajeX = nextX;
+  personajeY = nextY;
+  intentosDisplay.innerText = `Pasos: ${++count}`;
+
+  context.drawImage(
+      sprite,
+      personajeX * CELL_SIZE,
+      personajeY * CELL_SIZE,
+      CELL_SIZE,
+      CELL_SIZE
+  );
+
+  if (personajeX === meta.x && personajeY === meta.y) {
+    finDisplay.innerText = "¡HAS LLEGADO A LA META!";
+    pintar(personajeX, personajeY, "yellow");
     gameOver();
-    // context.strokeRect((personajeX-1) * 25, (personajeY-1) * 25, 25, 25);
-  }
-}
-//Comprobación de casillas
-let last;
-function movimiento(desp) {
-  last = convesorCoords(personajeX, personajeY);
-
-  console.log("last: " + last);
-  intentos.innerHTML = "Pasos: " + ++count;
-  let xV = parseInt(last.charAt(4) + last.charAt(5));
-  let yV = parseInt(last.charAt(2) + last.charAt(3));
-  let leftPos = xV - 1;
-  let rightPos = xV + 1;
-  let upPos = yV - 1;
-  let downPos = yV + 1;
-
-  if (leftPos < 10) {
-    leftPos = "0" + leftPos;
-  }
-  if (rightPos < 10) {
-    rightPos = "0" + rightPos;
-  }
-  if (upPos < 10) {
-    upPos = "0" + upPos;
-  }
-  if (downPos < 10) {
-    downPos = "0" + downPos;
-  }
-  if (xV < 10) {
-    xV = "0" + xV;
-  }
-  if (yV < 10) {
-    yV = "0" + yV;
-  }
-  let left = "ct" + yV.toString() + leftPos.toString();
-  let right = "ct" + yV.toString() + rightPos.toString();
-  let up = "ct" + upPos.toString() + xV.toString();
-  let down = "ct" + downPos.toString() + xV.toString();
-  let pos;
-  //ARRIBA
-  if (desp == 1) {
-    pos = up;
-  }
-  //ABAJO
-  if (desp == 2) {
-    pos = down;
-  }
-  //IZQUIERDA
-  if (desp == 3) {
-    pos = left;
-  }
-  //DERECHA
-  if (desp == 4) {
-    pos = right;
-  }
-  let movOk = true;
-  console.log(pos);
-  borders.forEach(function (border) {
-    if (pos == border) {
-      movOk = false;
-    }
-  });
-  walls.forEach(function (wall) {
-    if (pos == wall) {
-      movOk = false;
-    }
-  });
-  if (movOk) {
-    personajeX = parseInt(pos.charAt(4) + pos.charAt(5));
-    personajeY = parseInt(pos.charAt(2) + pos.charAt(3));
-    console.log("Moving to: " + convesorCoords(personajeX, personajeY));
-    mueveCanvas(desp);
   }
 }
 
-function convesorCoords(x, y) {
-  let xP = x;
-  let yP = y;
-  if (xP < 10) {
-    xP = "0" + xP;
-  }
-  if (yP < 10) {
-    yP = "0" + yP;
-  }
-  let posicion = "ct" + yP + xP;
-  return posicion;
-}
+function timerSet(duration) {
+  if (timerId) clearInterval(timerId);
 
-function timerSet() {
-  let time = space/40;
+  let remaining = duration;
+  const updateDisplay = () => {
+    const minutes = String(Math.floor(remaining / 60)).padStart(2, "0");
+    const seconds = String(remaining % 60).padStart(2, "0");
+    timeDisplay.innerText = `Time: ${minutes}:${seconds}`;
+  };
 
-  let timer = setInterval(function () {
-    let minutes = Math.floor(time / 60);
-    let seconds = Math.round(time % 60);
-    currentMinutes = minutes.toString().padStart(2, "0");
-    currentSeconds = seconds.toString().padStart(2, "0");
-    currentTime = currentMinutes + ":" + currentSeconds;
-    document.getElementById("time").innerHTML = "Time: " + currentTime;
-    time--;
-    if (time < 0) {
-      clearInterval(timer);
-      fin.innerHTML = "Game Over";
+  updateDisplay();
+
+  timerId = setInterval(() => {
+    remaining--;
+    updateDisplay();
+
+    if (remaining <= 0) {
+      clearInterval(timerId);
+      finDisplay.innerText = "Game Over";
       gameOver();
     }
-    if (over) {
-      clearInterval(timer);
-    }
-    console.log(timer);
   }, 1000);
 }
 
-//Mostrar o dejar de mostrar pantallas Inicio, Fin, Juego
-let start = document.getElementById("startScreen");
-let game = document.getElementById("cnv");
-let end = document.getElementById("gameOver");
-
 function startGame() {
-  start.style.display = "none";
-  game.style.display = "flex";
-  end.style.display = "none";
-  count = 0;
-  intentos.innerHTML = "Pasos: " + count;
-  visiteds = [];
-  NoBlockeds = [];
-  borders = [];
-  voids = [];
-  walls = [];
-  over = false;
-  clearCanvas();
-  createMaze();
-  personajeX = parseInt(visiteds[0].charAt(4) + visiteds[0].charAt(5));
-  personajeY = parseInt(visiteds[0].charAt(2) + visiteds[0].charAt(3));
+  if (timerId) clearInterval(timerId);
 
-  timerSet();
+  const selectedDiff = difficultySelect.value;
+  const config = DIFFICULTIES[selectedDiff] || DIFFICULTIES.medium;
+
+  canvas.width = config.cols * CELL_SIZE;
+  canvas.height = config.rows * CELL_SIZE;
+
+  startScreen.style.display = "none";
+  gameScreen.style.display = "flex";
+  endScreen.style.display = "none";
+
+  count = 0;
+  isGameOver = false;
+  intentosDisplay.innerText = `Pasos: ${count}`;
+
+  const mazeData = createMaze(config.cols, config.rows);
+  currentMaze = mazeData.maze;
+  personajeX = mazeData.start.x;
+  personajeY = mazeData.start.y;
+  meta = mazeData.end;
+
   context.drawImage(
-    jerry_down,
-    (personajeX - 1) * 25,
-    (personajeY - 1) * 25,
-    25,
-    25
+      jerry_down,
+      personajeX * CELL_SIZE,
+      personajeY * CELL_SIZE,
+      CELL_SIZE,
+      CELL_SIZE
   );
+
+  timerSet(config.time);
 }
+
 function gameOver() {
-  over = true;
-  start.style.display = "none";
-  game.style.display = "none";
-  end.style.display = "flex";
+  isGameOver = true;
+  if (timerId) clearInterval(timerId);
+  startScreen.style.display = "none";
+  gameScreen.style.display = "none";
+  endScreen.style.display = "flex";
 }

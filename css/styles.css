@@ -14,8 +14,8 @@ body {
   place-items: center;
 }
 #cnv {
-  margin-top: 2em;
-  margin-left: 2em;
+  /*margin-top: 2em;
+  margin-left: 2em; */
   justify-content: start;
   display: flex;
   /* align-items: center; */

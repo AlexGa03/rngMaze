@@ -1,48 +1,55 @@
 <!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="stylesheet" href="css/styles.css" />
-    <title>Document</title>
-    <script src="script.js" defer></script>
-  </head>
-  <body>
-    <header>
-      <h1 id="title">Tom & Jerry Laberinth</h1>
-    </header>
-    <div id="main">
-      <div id="cnv" style="display: none">
-        <div class="game">
-          <canvas id="marco" width="500" height="500"></canvas>
-        </div>
-        <div id="score">
-          <div class="tit">
-            <h3>High Score</h3>
-          </div>
-          <hr />
-          <div class="stats">
-            <p id="intentos">Pasos:</p>
-            <p id="time">Time:</p>
-            <br />
-          </div>
-        </div>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="css/styles.css" />
+  <title>Tom & Jerry Maze</title>
+  <script src="script.js" defer></script>
+</head>
+<body>
+<header>
+  <h1 id="title">Tom & Jerry Maze</h1>
+</header>
+<div id="main">
+  <div id="cnv" style="display: none">
+    <div class="game">
+      <canvas id="marco" width="525" height="525"></canvas>
+    </div>
+    <div id="score">
+      <div class="tit">
+        <h3>Estadísticas</h3>
       </div>
-      <div id="startScreen">
-        <a class="stBut" href="#" onclick="startGame()">Start</a>
-        <div class="controls"></div>
-      </div>
-      <div id="gameOver" style="display: none">
-        <div class="content">
-          <h1 id="meta"></h1>
-          <a class="stBut" href="#" onclick="startGame()">Play again</a>
-        </div>
-        
+      <hr />
+      <div class="stats">
+        <p id="intentos">Pasos: 0</p>
+        <p id="time">Time: 00:00</p>
       </div>
     </div>
-    <footer>
-      <h1><a href="https://github.com/AlexGa03">Alex_Garcia_Alvarez©Copyright</a></h1>
-    </footer>
-  </body>
+  </div>
+
+  <div id="startScreen">
+    <div class="difficulty-selection">
+      <label for="difficultySelect">Dificultad:</label>
+      <select id="difficultySelect">
+        <option value="easy">Fácil (15x15)</option>
+        <option value="medium" selected>Medio (21x21)</option>
+        <option value="hard">Difícil (29x29)</option>
+      </select>
+    </div>
+    <a class="stBut" href="#" onclick="startGame()">Start</a>
+  </div>
+
+  <div id="gameOver" style="display: none">
+    <div class="content">
+      <h1 id="meta"></h1>
+      <a class="stBut" href="#" onclick="startGame()">Play again</a>
+    </div>
+  </div>
+</div>
+<footer>
+  <h1><a href="https://github.com/AlexGa03">AlexGa03©Copyright</a></h1>
+</footer>
+</body>
 </html>
