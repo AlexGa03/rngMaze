@@ -216,7 +216,17 @@ function startGame() {
 
   timerSet(config.time);
 }
+function goToMenu() {
+  if (timerId) {
+    clearInterval(timerId);
+    timerId = null;
+  }
+  isGameOver = true;
 
+  gameScreen.style.display = "none";
+  endScreen.style.display = "none";
+  startScreen.style.display = "flex";
+}
 function gameOver() {
   isGameOver = true;
   if (timerId) clearInterval(timerId);
